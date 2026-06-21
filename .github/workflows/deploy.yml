@@ -31,18 +31,18 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/innovatech-frontend:latest
             ${{ secrets.DOCKER_HUB_USERNAME }}/innovatech-frontend:${{ github.sha }}
 
-      - name: Desplegar en EC2 Frontend
-        env:
-          DOCKER_USER: ${{ secrets.DOCKER_HUB_USERNAME }}
-          DOCKER_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
-          EC2_KEY: ${{ secrets.EC2_PRIVATE_KEY }}
-          EC2_USER: ${{ secrets.EC2_USER }}
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-        run: |
-          echo "$EC2_KEY" > /tmp/deploy_key.pem
-          chmod 600 /tmp/deploy_key.pem
-          ssh -o StrictHostKeyChecking=no -i /tmp/deploy_key.pem $EC2_USER@$EC2_HOST "docker login -u $DOCKER_USER -p $DOCKER_TOKEN && docker pull $DOCKER_USER/innovatech-frontend:latest && docker stop innovatech-frontend || true && docker rm innovatech-frontend || true && docker run -d --name innovatech-frontend --restart unless-stopped -p 80:80 $DOCKER_USER/innovatech-frontend:latest"
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
 
-      - name: Limpiar claves
-        if: always()
-        run: rm -f /tmp/deploy_key.pem
+      - name: Desplegar en ECS Fargate
+        run: |
+          aws ecs update-service \
+            --cluster ep3-innovatech-cluster-v2 \
+            --service ep3-frontend-service \
+            --force-new-deployment \
+            --region us-east-1
